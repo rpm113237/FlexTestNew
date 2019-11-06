@@ -22,7 +22,9 @@ long int CycleCnt = 0;
 //  long int RtCnt[] = {0,0,0,0,0};
 char OutString[150];   //for sprintf
 
-enum lines {Plus48, RED, IR, Plus5, GND};
+enum sides{Lt, Rt};
+enum flexlines {ln48V=0,lnRED, lnIR, ln5V, lnGND}lnName;
+
 
 
 
@@ -31,20 +33,30 @@ enum lines {Plus48, RED, IR, Plus5, GND};
 #define LOOSE false
 #define TAUT true
 
-//  struct linestruct{
-//    // contains everything--this an entry in an array of structs
-//    char ID[12];    //"48V":, "REDSig", "IRSig", etc.
-//    int SnsPin;     //pin to read status Input w pullup
-//    int DrvPin;     //Pin to drive low for sense
-//    long int FirstFail;  //First Detected failure
-//    long int LatestGood; //Last low read
-//    int NumIntrmt;    //number of good reads since first fail
-//    bool Intact;    //== true if Intact
-//    bool fail_on_taut;  // true if failed taut
-//    bool fail_on_loose; // true if failed on loose
-//  };
-//
-//  struct linestruct linfo[2];
+  struct tracestruct{
+    bool trintact;      //true if intact
+    bool trFailTaut;    //true if failed taut
+    bool trFailLoose;   //true if failed loose
+    long int FirstFail; //Count at which first failed
+    long int LastGood;  //Count at which last good
+    int  numGoods;       //number of times good since first fail    
+  };
+
+  struct tracestruct traces;
+
+  struct cablestruct {
+    tracestruct traces[5];
+    int SolTightPin;       // solonoid to pull tight
+    int SolLoosePin;       //solonoid to push loose
+    char traceID[15];     //such as "48V 8mm", "48V abc" etc.
+    int pinSns[5] = {1,2,3,4,5};
+    //since can't figure out structur for not and enoughis enough
+  }cablex[2];
+
+
+ 
+    
+
 
 struct linestatus {
   long int FirstFail;  //number of cycles to first failure
@@ -65,15 +77,23 @@ int addrCycleCnt = EEPROM.getAddress(sizeof(CycleCnt));
 int addrLeftSide = EEPROM.getAddress(sizeof(LtSide));
 int addrRightSide = EEPROM.getAddress(sizeof(RtSide));
 
+void InitStructs(){
+//strcpy (Cable[0].traceID, "48V");
+cablex[0].SolTightPin = 1;
+  
+}
+
 void InitFlexBd(void) {  //initializesn all the pins; set up Structs
   //define sense.  Input Pullup, left/right are driven low
   long int tstCnt = 0;
 
+  
   pinMode(Sns48V, INPUT_PULLUP);
   pinMode(SnsRED, INPUT_PULLUP);
   pinMode(SnsIR, INPUT_PULLUP);
   pinMode(Sns5V, INPUT_PULLUP);
   pinMode(SnsGND, INPUT_PULLUP);
+  
 
 
   tstCnt = EEPROM.readLong(addrCycleCnt);
@@ -119,6 +139,12 @@ void setup() {
   char CntStr[30];    //for diag out
   int i = 0;
   long int Elong = 0;
+
+//  cable[0].SnsPin[1] = 48;
+//  strcpy(cable[0].traces[0].traceID, "hello world");
+  
+  
+  EEPROM.setMaxAllowedWrites (10000);    //default is 100
   Serial.begin(115200);
   Serial.println("Starting.......");
 
@@ -138,9 +164,9 @@ void setup() {
   Serial.println("-----------------------------------");
 
   Serial.println("begin address \t\t size");
-  Serial.print(addrCycleCnt);      Serial.print(" \t\t\t "); Serial.print(sizeof(CycleCnt)); Serial.println(" (long)");
-  Serial.print(addrLeftSide);       Serial.print(" \t\t\t "); Serial.print(sizeof(LtSide));  Serial.println(" (struc RtSide)");
-  Serial.print(addrRightSide);      Serial.print(" \t\t\t "); Serial.print(sizeof(RtSide)); Serial.println(" (struc LtSide)");
+  Serial.print(addrCycleCnt); Serial.print(" \t\t\t "); Serial.print(sizeof(CycleCnt)); Serial.println(" (long)");
+  Serial.print(addrLeftSide); Serial.print(" \t\t\t "); Serial.print(sizeof(LtSide));  Serial.println(" (struc RtSide)");
+  Serial.print(addrRightSide);Serial.print(" \t\t\t "); Serial.print(sizeof(RtSide)); Serial.println(" (struc LtSide)");
 
   Elong = EEPROM.readLong(addrCycleCnt);
   Serial.print( "CycleCnt at init = "); Serial.println( Elong);
