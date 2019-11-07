@@ -12,50 +12,45 @@
 #define Sns5V 29
 #define SnsGND 31
 //define Drivers
-#define LtDrv 47
-#define RtDrv 49
-//arrays to store how many times rt & left has been cycled
-//These will be stored in EEPROM?
-//Need way to init???
+#define DrvPin 47
+//#define RtDrv 49
+
 long int CycleCnt = 0;
-//  long int LtCnt[] = {0,0,0,0,0};
-//  long int RtCnt[] = {0,0,0,0,0};
+#define numtraces 5   
+#define numcables 2 
 char OutString[150];   //for sprintf
 
-enum sides{Lt, Rt};
-enum flexlines {ln48V=0,lnRED, lnIR, ln5V, lnGND}lnName;
-
-
-
+enum sides {Lt, Rt} cblside;
+enum flexlines {ln48V = 0, lnRED, lnIR, ln5V, lnGND} lnName;
 
 #define LOOSEMS 500
 #define TAUTMS  25
 #define LOOSE false
 #define TAUT true
 
-  struct tracestruct{
-    bool trintact;      //true if intact
-    bool trFailTaut;    //true if failed taut
-    bool trFailLoose;   //true if failed loose
-    long int FirstFail; //Count at which first failed
-    long int LastGood;  //Count at which last good
-    int  numGoods;       //number of times good since first fail    
-  };
+struct tracestruct {
+  bool trintact;      //true if intact
+  bool trFailTaut;    //true if failed taut
+  bool trFailLoose;   //true if failed loose
+  long int FirstFail; //Count at which first failed
+  long int LastGood;  //Count at which last good
+  int  numGoods;       //number of times good since first fail
+};
 
-  struct tracestruct traces;
+struct tracestruct traces;
 
-  struct cablestruct {
-    tracestruct traces[5];
-    int SolTightPin;       // solonoid to pull tight
-    int SolLoosePin;       //solonoid to push loose
-    char traceID[15];     //such as "48V 8mm", "48V abc" etc.
-    int pinSns[5] = {1,2,3,4,5};
-    //since can't figure out structur for not and enoughis enough
-  }cablex[2];
+struct cablestruct {
+  tracestruct traces[numtraces];
+  int SolTightPin;       // solonoid to pull tight
+  int SolLoosePin;       //solonoid to push loose
+  char traceID[numtraces][15];     //such as "48V 8mm", "48V abc" etc.
+  int pinSns[numtraces] = {1, 2, 3, 4, 5};
+  //since can't figure out structur for not and enoughis enough
+} cablex[numcables];
 
 
- 
-    
+
+
 
 
 struct linestatus {
@@ -77,23 +72,30 @@ int addrCycleCnt = EEPROM.getAddress(sizeof(CycleCnt));
 int addrLeftSide = EEPROM.getAddress(sizeof(LtSide));
 int addrRightSide = EEPROM.getAddress(sizeof(RtSide));
 
-void InitStructs(){
-//strcpy (Cable[0].traceID, "48V");
-cablex[0].SolTightPin = 1;
-  
+void InitStructs() {
+  //strcpy (Cable[0].traceID, "48V");
+  cblside = Lt;
+  cablex[cblside].SolTightPin = 1;
+  cablex[cblside].SolLoosePin = 1;
+  strcpy (cablex[cblside].traceID[0], "what the F");
+  Serial.print("Trace ID "); Serial.print (cblside);  Serial.println (cablex[cblside].traceID[0]);
+  while (1) {
+
+  }
+
 }
 
 void InitFlexBd(void) {  //initializesn all the pins; set up Structs
   //define sense.  Input Pullup, left/right are driven low
   long int tstCnt = 0;
 
-  
+  InitStructs();
   pinMode(Sns48V, INPUT_PULLUP);
   pinMode(SnsRED, INPUT_PULLUP);
   pinMode(SnsIR, INPUT_PULLUP);
   pinMode(Sns5V, INPUT_PULLUP);
   pinMode(SnsGND, INPUT_PULLUP);
-  
+
 
 
   tstCnt = EEPROM.readLong(addrCycleCnt);
@@ -123,8 +125,8 @@ void InitFlexBd(void) {  //initializesn all the pins; set up Structs
   }
   // set up drivers as inputs--they change to outputs
 
-  pinMode(LtDrv, INPUT);
-  pinMode(RtDrv, INPUT);
+//  pinMode(LtDrv, INPUT);
+//  pinMode(RtDrv, INPUT);
 
   //set up solenoid drivers as outputs (& High= Denergized)
 
@@ -140,10 +142,6 @@ void setup() {
   int i = 0;
   long int Elong = 0;
 
-//  cable[0].SnsPin[1] = 48;
-//  strcpy(cable[0].traces[0].traceID, "hello world");
-  
-  
   EEPROM.setMaxAllowedWrites (10000);    //default is 100
   Serial.begin(115200);
   Serial.println("Starting.......");
@@ -153,12 +151,6 @@ void setup() {
   //    EEPROM.write(i, 0xFF);
   //  }
 
-  //   // Always get the adresses first and in the same order
-  //    int addrCycleCnt      = EEPROM.getAddress(sizeof(CycleCnt));
-  //    int addrLeftSide    = EEPROM.getAddress(sizeof(LtSide));
-  //    int addrRightSide      = EEPROM.getAddress(sizeof(RtSide));
-
-
   Serial.println("-----------------------------------");
   Serial.println("Following adresses have been issued");
   Serial.println("-----------------------------------");
@@ -166,7 +158,7 @@ void setup() {
   Serial.println("begin address \t\t size");
   Serial.print(addrCycleCnt); Serial.print(" \t\t\t "); Serial.print(sizeof(CycleCnt)); Serial.println(" (long)");
   Serial.print(addrLeftSide); Serial.print(" \t\t\t "); Serial.print(sizeof(LtSide));  Serial.println(" (struc RtSide)");
-  Serial.print(addrRightSide);Serial.print(" \t\t\t "); Serial.print(sizeof(RtSide)); Serial.println(" (struc LtSide)");
+  Serial.print(addrRightSide); Serial.print(" \t\t\t "); Serial.print(sizeof(RtSide)); Serial.println(" (struc LtSide)");
 
   Elong = EEPROM.readLong(addrCycleCnt);
   Serial.print( "CycleCnt at init = "); Serial.println( Elong);
@@ -183,22 +175,8 @@ void setup() {
 
   //  Serial.print ("length of lengthstruct = "); Serial.println ( sizeof(linestruct));
   InitFlexBd();
-  //  int i =0;
-  //  while (i<10) {
-  //    i++;
-  //    Serial.print( "iteration = ");
-  //    Serial.println(i);
-  //    solenoidsON();
-  //    delay(TAUTMS);
-  //    solenoidsOFF();
-  //    delay (LOOSEMS);
-  //  }
-
-
-
 
 }
-
 
 void solenoidsOFF() {
   digitalWrite(Sol_Left, SolOFF); //HIGH turns ON
@@ -214,25 +192,58 @@ void solenoidsON() {
 
 }
 
-void setLeft(void) {
-  // Set left Drive LOW, Right Drive as Input
-  pinMode(LtDrv, OUTPUT);
-  pinMode(RtDrv, INPUT);
-  digitalWrite(LtDrv, LOW);
-}
+//void setLeft(void) {
+//  // Set left Drive LOW, Right Drive as Input
+//  pinMode(LtDrv, OUTPUT);
+//  pinMode(RtDrv, INPUT);
+//  digitalWrite(LtDrv, LOW);
+//}
 
-void setRight(void) {
-  // Set left Drive LOW, Right Drive as Input
-  pinMode(RtDrv, OUTPUT);
-  pinMode(LtDrv, INPUT);
-  digitalWrite(RtDrv, LOW);
-}
+//void setRight(void) {
+//  // Set left Drive LOW, Right Drive as Input
+//  pinMode(RtDrv, OUTPUT);
+//  pinMode(LtDrv, INPUT);
+//  digitalWrite(RtDrv, LOW);
+//}
 
+void ckttraces(void){
+int cs, tnm;
+bool taut = true;   //fake for development
+
+//set up solonoids for taut; delay tauttime
+
+for (int cs = 0; cs<= numcables; cs++) {
+  for(tnm = 0; tnm<= numtraces; tnm= tnm++);{
+    pinMode(DrvPin, OUTPUT);
+    digitalWrite(DrvPin,LOW);    //why not in setup.  Do it once?  We are not driving two independent systems
+    pinMode(cablex[cs].pinSns[tnm], INPUT_PULLUP);    //should be anyway
+    delay(5); //give it 5 ms to settle.
+    
+    if (digitalRead(cablex[cs].pinSns[tnm]) == HIGH){  //floated HIGH==bad
+      if(cablex[cs].traces[tnm].trintact == true){
+       cablex[cs].traces[tnm].FirstFail = CycleCnt;
+       cablex[cs].traces[tnm].trintact = false;
+       if (taut==true)cablex[cs].traces[tnm].trFailTaut = true;
+       else cablex[cs].traces[tnm].trFailLoose = true; 
+      }    
+    }
+    else {        //good (LOW)
+      if(cablex[cs].traces[tnm].trintact == false){   //good, but has failed before
+         cablex[cs].traces[tnm].LastGood = CycleCnt;
+         cablex[cs].traces[tnm].numGoods++;
+      }
+      
+    }
+   
+  }  
+  
+}
+}
 
 void ckLtSide(bool tight) {   //if tight--see loose def's
   char SCnt[30], Icnt[30];
 
-  setLeft();    //set up for left side low, right floating
+//  setLeft();    //set up for left side low, right floating
   //itoa (CycleCnt, SCnt,10);
   if (tight) sprintf  (OutString, "(Taut)  LEFT   Side; Count = %lu ", CycleCnt);
   if (!tight) sprintf  (OutString, "(LOOSE) LEFT   Side; Count = %lu ", CycleCnt);
@@ -333,7 +344,7 @@ void ckLtSide(bool tight) {   //if tight--see loose def's
 void ckRtSide(bool tight) {   //if tight--see loose def's
   char SCnt[30], Icnt[10];
 
-  setRight();    //set up for left side low, right floating
+//  setRight();    //set up for left side low, right floating
   //itoa (CycleCnt, SCnt,10);
 
   if (tight) sprintf  (OutString, "(Taut)  RIGHT  Side; Count = %lu ", CycleCnt);
