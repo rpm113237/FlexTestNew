@@ -25,6 +25,8 @@ char OutString[150];   //for sprintf
 #define LOOSEMS 25
 #define TAUTMS  25
 #define SLACKMS (CYCLEMS - LOOSEMS - TAUTMS)/2
+
+#define STORECNT 100   //store the structure modulo this
 //#define SLACKMS 500
 
 
@@ -68,7 +70,7 @@ void InitStructs() {
 
   tstCnt = EEPROM.readLong(addrCycleCnt);
   if (tstCnt > 0) { //Has been running?
-    Serial.print ("Stored Count at start up = %ld "); Serial.println(tstCnt);
+    Serial.print ("Stored Count at start up = "); Serial.println(tstCnt);
     CycleCnt = tstCnt;
     EEPROM.readBlock (addrStruc, cablex[2]);
   }
@@ -120,7 +122,7 @@ void reportResults(void) {
   char cntstr[15]; //for long counts
 
   ltoa(CycleCnt, cntstr, 10);
-  Serial.print ("At CycleCnt = "); Serial.println(cntstr);
+  //Serial.print ("At CycleCnt = "); Serial.println(cntstr);
 
   for (cs = 0; cs < numcables; cs++) {
     ltoa(CycleCnt, cntstr, 10);
@@ -159,7 +161,7 @@ void setup() {
   int i = 0, j = 0;
   long int Elong = 0;
   Serial.begin(115200);
-  Serial.println("Starting.......");
+  Serial.println("\nStarting.......");
 
   EEPROM.setMaxAllowedWrites (10000);    //default is 100
   EEPROM.setMemPool(0, EEPROMSizeUno);
@@ -293,17 +295,16 @@ void loop() {
   
 
   reportResults();
-
-  //  if (CycleCnt % 500 == 0) {
-  //    EEPROM.writeLong(addrCycleCnt, CycleCnt);
-  //    EEPROM.writeBlock(addrLeftSide, LtSide);
-  //    EEPROM.writeBlock(addrRightSide, RtSide);
-  //    Serial.println("-----------------------------------");
-  //    Serial.print(" CycleCnt written out at CycleCnt = "); Serial.println(CycleCnt);
-  //    Serial.println("-----------------------------------");
-  //
-  //  }
-
+    if (CycleCnt < 3* STORECNT){    //limit the debug stores
+      if (CycleCnt % STORECNT == 0) {
+        EEPROM.writeLong(addrCycleCnt, CycleCnt);
+        EEPROM.updateBlock(addrStruc, cablex[2]);
+        Serial.println("-----------------------------------");
+        Serial.print(" CycleCnt written out at CycleCnt = "); Serial.println(CycleCnt);
+        Serial.println("-----------------------------------");
+    
+      }
+    }   //end debug
 }
 
 void ZeroEEPROM(void) {
