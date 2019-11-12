@@ -58,11 +58,17 @@ struct cablestruct {
   //since can't figure out structur for not and enoughis enough
 } cablex[numcables];
 
-int top;
+//int top;
 // Always get the adresses first and in the same order
 int addrCycleCnt = EEPROM.getAddress(sizeof(CycleCnt));
-int addrStruc = EEPROM.getAddress(sizeof(cablex[2]));
-int addrTop = EEPROM.getAddress(sizeof(top));
+int addStruc0 = EEPROM.getAddress(sizeof(cablex[0]));
+int addStruc1 = EEPROM.getAddress(sizeof(cablex[1]));
+//int addrTop = EEPROM.getAddress(sizeof(top));   //just to see top address
+
+void getStruct() {
+  EEPROM.readBlock (addStruc0, cablex[0]);
+  EEPROM.readBlock(addStruc1, cablex[1]);
+}
 
 void InitStructs() {
   int cs = 0, tr = 0;
@@ -72,26 +78,28 @@ void InitStructs() {
   if (tstCnt > 0) { //Has been running?
     Serial.print ("Stored Count at start up = "); Serial.println(tstCnt);
     CycleCnt = tstCnt;
-    EEPROM.readBlock (addrStruc, cablex[2]);
+    getStruct();
+    reportResults(true);
+    //while(1);
   }
   else {         // stored cnt zero or 0xFFFFFFF
     //init cycle count to zero
     CycleCnt = 0;   //could be == zero or ==0xFF
-    EEPROM.writeLong(0, CycleCnt);
+    EEPROM.writeLong(addrCycleCnt, CycleCnt);
     Serial.print( "CycleCnt initialized to "); Serial.println( CycleCnt);
 
     //structure stuff that has tp be done individually.
-    strcpy( cablex[0].traceID[0], "P48V_0");
+    strcpy( cablex[0].traceID[0], "48V_0");
     strcpy( cablex[0].traceID[1], "RED_0");
     strcpy( cablex[0].traceID[2], "IR_0");
     strcpy( cablex[0].traceID[3], "P5V_0");
-    strcpy( cablex[0].traceID[4], "PGND_0");
+    strcpy( cablex[0].traceID[4], "GND_0");
 
-    strcpy( cablex[1].traceID[0], "P48V_1");
+    strcpy( cablex[1].traceID[0], "48V_1");
     strcpy( cablex[1].traceID[1], "RED_1");
     strcpy( cablex[1].traceID[2], "IR_1");
-    strcpy( cablex[1].traceID[3], "P5V_1");
-    strcpy( cablex[1].traceID[4], "PGND_1");
+    strcpy( cablex[1].traceID[3], "5V_1");
+    strcpy( cablex[1].traceID[4], "GND_1");
 
     cablex[0].SolLoosePin = Sol_0_Loose;
     cablex[1].SolLoosePin = Sol_1_Loose;
@@ -106,23 +114,48 @@ void InitStructs() {
         cablex[cs].traces[tr].trintact = true;
         cablex[cs].traces[tr].trFailTaut = false;
         cablex[cs].traces[tr].trFailLoose = false;
+        //        cablex[cs].traces[tr].FirstFail = 12345678 + tr+ (cs+1)*10;
         cablex[cs].traces[tr].FirstFail = 0;
         cablex[cs].traces[tr].LastGood = 0;
         cablex[cs].traces[tr].numGoods = 0;
       }
     }
-    EEPROM.updateBlock(addrStruc, cablex[2]);
-    Serial.println("Initialization"); reportResults();
+    writeStruc();
+    //    EEPROM.updateBlock(addStruc0, cablex[1]);
+    //    EEPROM.updateBlock(addStruc1, cablex[2]);
+    Serial.println(" @ Initialization"); reportResults(true);
+
   }
 }
 
-void reportResults(void) {
+void writeStruc(void) {
+  //  bool verbose = true;
+  //    Serial.print("\n************Store Struc at Cnt =" ); Serial.println(CycleCnt);
+  EEPROM.updateBlock(addStruc0, cablex[0]);
+  EEPROM.updateBlock(addStruc1, cablex[1]);
+  //    Serial.println("************Readback Stored Struc at Cnt =" );
+  //    getStruct();
+  //    reportResults(verbose);
+  //    Serial.println("******************************************\n" );
+
+
+}
+
+void reportResults(bool verbose) {
   int cs = 0, tr = 0;
   int i = 0, j = 0;
   char cntstr[15]; //for long counts
 
   ltoa(CycleCnt, cntstr, 10);
   //Serial.print ("At CycleCnt = "); Serial.println(cntstr);
+
+  if (verbose) {    //print all the stuff
+    Serial.println("\n**************In reportResults (verbose)***********");
+    for (cs = 0; cs < numcables; cs++) {
+      Serial.print ("LoosePin = "); Serial.print(cablex[cs].SolLoosePin);
+      Serial.print (" TautPin = "); Serial.print(cablex[cs].SolTautPin); CR;
+    }   CR;
+  }
 
   for (cs = 0; cs < numcables; cs++) {
     ltoa(CycleCnt, cntstr, 10);
@@ -140,7 +173,6 @@ void reportResults(void) {
       }
       if (cablex[cs].traces[tr].LastGood >= 0) {
         ltoa(cablex[cs].traces[tr].LastGood, cntstr, 10); //real
-        //        ltoa(987654321, cntstr,10);   //for test
         Serial.print("Last GOOD @ "); Serial.print(cntstr); TAB;
         Serial.print("Num GOODs "); Serial.print(cablex[cs].traces[tr].numGoods); TAB;
       }
@@ -152,6 +184,8 @@ void reportResults(void) {
   }//end for cs
 
   CR;
+
+
 }//end report
 
 
@@ -160,6 +194,7 @@ void setup() {
   char CntStr[30];    //for diag out
   int i = 0, j = 0;
   long int Elong = 0;
+  bool verbose = true;
   Serial.begin(115200);
   Serial.println("\nStarting.......");
 
@@ -168,16 +203,20 @@ void setup() {
 
   //  while(1);
   //  uncomment the following to reset EEPROM
-  //ZeroEEPROM();
+  //  ZeroEEPROM();
   //uncomment to print out EEPROM addresses
-  //PrintEEPROMAddresses();
+  //  PrintEEPROMAddresses();
   InitStructs();
+
   //set up solenoids as outputs
   for (i = 0; i < numcables; i++) { //cleaner in initstructs???
     pinMode(cablex[i].SolTautPin, OUTPUT);
+    //    Serial.print(cablex[i].SolTautPin); SP; Serial.print(i); SP; Serial.println(" Taut Pin At Setup");
     pinMode(cablex[i].SolLoosePin, OUTPUT);
+    //    Serial.print(cablex[i].SolLoosePin);  SP; Serial.print(i); SP; Serial.println(" Loose Pin At Setup");
   }
-
+  //  Serial.println("After set solenoids--silly to print here");
+  //  reportResults(verbose);    //deubug
 }
 
 void solenoidsSet(int side, bool istaut) {
@@ -187,7 +226,7 @@ void solenoidsSet(int side, bool istaut) {
   // turn all solenoids OFF then (side) ON
   //if side <0; means leave all off.
 
-  
+
 
   if (side >= 0) {
     //    Serial.print("For Side = "); Serial.println(side);
@@ -196,14 +235,14 @@ void solenoidsSet(int side, bool istaut) {
     if (!istaut)digitalWrite(cablex[side].SolLoosePin, SolON);
     //    Serial.print("setting LOOSE ON, pin = "); Serial.println(cablex[side].SolLoosePin);}
   }
-   else{
-//    Serial.print("Slack");
+  else {
+    //    Serial.print("Slack");
     for (i = 0; i < numcables; i++) {
       digitalWrite(cablex[i].SolTautPin, SolOFF);
       digitalWrite(cablex[i].SolLoosePin, SolOFF);
-  }
+    }
 
-}
+  }
   //  CR;
 }// end
 
@@ -238,7 +277,7 @@ void cktraces(bool taut) {
       if (digitalRead(cablex[cs].pinSns[tnm]) == HIGH) { //floated HIGH==bad
         //          Serial.print("cktraces finds high for cable ="); Serial.println(tnm);
         if (cablex[cs].traces[tnm].trintact == true) {
-          cablex[cs].traces[tnm].FirstFail = CycleCnt;
+          //cablex[cs].traces[tnm].FirstFail = CycleCnt;//!!!!!for debug
           cablex[cs].traces[tnm].trintact = false;
           if (taut == true)cablex[cs].traces[tnm].trFailTaut = true;
           else cablex[cs].traces[tnm].trFailLoose = true;
@@ -281,30 +320,32 @@ void loop() {
   //  Serial.print("CycleCnt (MAIN LOOP) = "); Serial.println (CycleCnt);
   istaut = true;
   for (i = 0; i < numcables; i++) solenoidsSet(i, istaut);  //set all taut
-    delay (TAUTMS);
-    cktraces(istaut);
-    solenoidsSet(-1, istaut);
-    delay(SLACKMS);
+  delay (TAUTMS);
+  cktraces(istaut);
+  solenoidsSet(-1, istaut);
+  delay(SLACKMS);
 
-    istaut = false;
-    for (i=0; i<numcables; i++) solenoidsSet(i, istaut);
-    delay (LOOSEMS);
-    cktraces(istaut);
-    solenoidsSet(-1, istaut);
-    delay(SLACKMS);
-  
+  istaut = false;
+  for (i = 0; i < numcables; i++) solenoidsSet(i, istaut);
+  delay (LOOSEMS);
+  cktraces(istaut);
+  solenoidsSet(-1, istaut);
+  delay(SLACKMS);
 
-  reportResults();
-    if (CycleCnt < 3* STORECNT){    //limit the debug stores
-      if (CycleCnt % STORECNT == 0) {
-        EEPROM.writeLong(addrCycleCnt, CycleCnt);
-        EEPROM.updateBlock(addrStruc, cablex[2]);
-        Serial.println("-----------------------------------");
-        Serial.print(" CycleCnt written out at CycleCnt = "); Serial.println(CycleCnt);
-        Serial.println("-----------------------------------");
-    
-      }
-    }   //end debug
+
+  reportResults(false);
+  //    if (CycleCnt < 3* STORECNT){    //limit the debug stores
+  if (CycleCnt % STORECNT == 0) {
+    EEPROM.writeLong(addrCycleCnt, CycleCnt);
+    writeStruc();
+//    Serial.println("in loop readback = ");
+    reportResults(true);
+    Serial.println("-----------------------------------");
+    Serial.print(" CycleCnt written out at CycleCnt = "); Serial.println(CycleCnt);
+    Serial.println("-----------------------------------");
+
+  }
+  //    }   //end debug
 }
 
 void ZeroEEPROM(void) {
@@ -322,6 +363,7 @@ void PrintEEPROMAddresses(void) {
 
   Serial.println("begin address \t\t size");
   Serial.print(addrCycleCnt); Serial.print(" \t\t\t "); Serial.print(sizeof(CycleCnt)); Serial.println(" (long)");
-  Serial.print(addrStruc); Serial.print(" \t\t\t "); Serial.print(sizeof(addrStruc));  Serial.println(" (structure)");
-  Serial.print(addrTop); Serial.print(" \t\t\t "); Serial.print(sizeof(top)); Serial.println(" (int)--just here to tag the structure");
+  Serial.print(addStruc0); Serial.print(" \t\t\t "); Serial.print(sizeof(cablex[0]));  Serial.println(" (first structure)");
+  Serial.print(addStruc1); Serial.print(" \t\t\t "); Serial.print(sizeof(cablex[1]));  Serial.println(" (second structure)");
+  //  Serial.print(addrTop); Serial.print(" \t\t\t "); Serial.print(sizeof(top)); Serial.println(" (int)--just here to tag the structure");
 }
